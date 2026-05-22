@@ -1,3 +1,5 @@
+https://buymeacoffee.com/weemaba
+
 # Tap Electric Charger — Home Assistant Community Integration
 
 [![HACS Default](https://img.shields.io/badge/HACS-custom-blue.svg)](https://hacs.xyz)
