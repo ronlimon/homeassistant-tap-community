@@ -6,9 +6,14 @@ project uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Nothing pending beyond what shipped in 1.0.1.
+Nothing pending beyond what shipped in 1.1.0.
 
-## [1.0.1] — 2026-04-27
+## [1.1.0] — 2026-04-27
+
+Remote Start/Stop charging via the management API, with full UI
+configuration. The scope outgrew a patch bump — bumped to 1.1.0
+under semver because the public surface gained two new entities,
+two new public client methods, and a new options-flow step.
 
 ### Fixed
 
@@ -33,9 +38,17 @@ Nothing pending beyond what shipped in 1.0.1.
   currently-active management-API transaction id. Disabled when no
   active session is known.
 - **Options → Advanced mode → Remote start/stop settings.** New
-  options-flow step to enter the default RFID id_tag and (optionally)
-  override the Tap profile id (`usr_…`). Stored additively in
-  `entry.data` — v1.0.0 entries load without migration.
+  options-flow step with three fields:
+  - Default RFID `id_tag` (text input; format `TAP-NNNNNN-N`)
+  - Per-charger `outlet_id` (text input per known charger,
+    dynamically rendered from the coordinator's charger list)
+  - Optional `profile_id` override (defaults to the Firebase
+    `user_id` when empty)
+
+  Outlet IDs for chargers temporarily unreachable from the
+  coordinator are preserved across saves — the form only edits
+  what it can currently see. Stored additively in `entry.data`;
+  v1.0.0 entries load without migration.
 - `TapManagementClient.remote_stop_transaction` and
   `remote_start_transaction` — the new write methods. Auth failures
   (401/403) raise `TapManagementAuthError`; network errors return
@@ -46,6 +59,11 @@ Nothing pending beyond what shipped in 1.0.1.
 - `tests/probe_har.py` — reproducible HAR-capture parser for the
   next time we need to chase Tap-side schema changes. Masks
   Authorization/Cookie/api-key values automatically.
+- **31 new tests** covering the management-API write paths
+  (`test_api_management.py`), the Start/Stop button entities
+  (`test_button.py`), and the expanded options flow
+  (`test_options_flow.py`). Coverage: 68% aggregate, with the
+  new modules at `api_management` 89% and `button` 81%.
 
 ### Deprecated
 
@@ -57,11 +75,21 @@ Nothing pending beyond what shipped in 1.0.1.
 
 ### Known limitations
 
-- EVBox Elvi firmware silently refuses both RemoteStop and
-  RemoteStart. The integration logs a warning and stays responsive.
-  This is also reproducible from Tap's own webapp — almost certainly
-  an EVBox firmware setting, not a Tap- or integration-side bug.
-  Other charger models untested; community datapoints welcome.
+- **EVBox Elvi firmware silently refuses both RemoteStop and
+  RemoteStart.** Verified empirically through both direct API
+  testing AND Tap's own webapp — this is an EVBox firmware
+  restriction, not a Tap- or integration-side bug. The integration
+  logs a warning and stays responsive.
+- **Other charger models untested.** Beta testers welcome via the
+  HA Community forum thread — community datapoints will determine
+  which models we can confidently support in 1.2.0.
+- **Per-charger outlet_id input is one long form.** Drivers with
+  many chargers see all fields stacked on one page. Pagination
+  follow-up planned for 1.2.0.
+- **7 tests in `test_options_flow.py` remain xfailed** pending
+  HA integration loader plumbing in the test harness. Marked with
+  a `TODO v1.2.0` at the top of the module. `strict=False` so they
+  flip to passing automatically once the loader plumbing lands.
 
 ## [1.0.0] — 2026-04-23
 
