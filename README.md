@@ -1,4 +1,4 @@
-https://buymeacoffee.com/weemaba
+[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/JOUW_USERNAME)
 
 # Tap Electric Charger — Home Assistant Community Integration
 
