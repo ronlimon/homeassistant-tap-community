@@ -88,9 +88,9 @@
       },
       "advanced_remote": {
         "title": "Einstellungen für Fernstart/-stopp",
-        "description": "Optional. RFID-Tag für den Fernstart und die Profil-ID des chargerManagement-Endpunkts von Tap festlegen. Beide Felder leer lassen, um den Fernstart zu deaktivieren (Fernstopp benötigt nur die aktive Transaktions-ID, die die Integration bereits kennt).",
+        "description": "Fernstart konfigurieren. Drei Felder:\n\n• **Standard-RFID-Tag** — der id_tag, der bei RemoteStartTransaction gesendet wird (Format TAP-NNNNNN-N). Zu finden in der Tap-Webapp unter Autorisaties (Autorisierungen) oder auf der Rückseite Ihrer physischen RFID-Karte.\n\n• **Outlet-ID pro Ladepunkt** — Taps interner Outlet-Identifier (ou_*) pro Ladepunkt. Erforderlich für Fernstart. Über den Netzwerk-Tab (F12) der Tap-Webapp bei einer Fernstart-Anfrage erfassen, oder `tests/probe_har.py` auf einer gespeicherten .har-Datei ausführen.\n\n• **Profil-ID** — optional. Überschreibt die usr_*-Profilkennung, die an Taps chargerManagement-Endpunkt gesendet wird. Leer lassen, um Ihre Firebase user_id zu verwenden (Standard).\n\nAlle Felder leer lassen, um den Fernstart zu deaktivieren. Fernstopp funktioniert weiterhin — er benötigt nur die aktive Transaktions-ID, die die Integration bereits verfolgt.",
         "data": {
-          "default_id_tag": "Standard-RFID-Tag für Fernstart (optional)",
+          "default_id_tag": "Standard-RFID-Tag (TAP-NNNNNN-N)",
           "advanced_profile_id": "Tap-Profil-ID (usr_…, optionaler Override)"
         }
       }

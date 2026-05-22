@@ -13,6 +13,9 @@ __pycache__/
 .phaseB-backup/
 .v1-backup/
 .v2-backup/
+*.preui-backup
+*.v101-backup
+*.phase*-backup
 tests/__pycache__/
 .coverage
 *.har

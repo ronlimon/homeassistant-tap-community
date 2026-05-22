@@ -55,6 +55,7 @@ from .const import (
     CONF_CHARGER_ID,
     CONF_DEFAULT_ID_TAG,
     CONF_WEBHOOK_SECRET,
+    DATA_DEFAULT_OUTLET_IDS,
     DEFAULT_BASE_URL,
     DEFAULT_OPTIONS,
     DOMAIN,
@@ -400,25 +401,77 @@ class TapOptionsFlowHandler(config_entries.OptionsFlow):
             menu_options=options,
         )
 
+    def _known_chargers(self) -> list[tuple[str, str]]:
+        """Return [(charger_id, display_name), …] from the running coordinator.
+
+        Empty list if the integration isn't loaded yet (the form still
+        renders with id_tag + profile_id, just no outlet fields).
+        """
+        bucket = (
+            self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+            or {}
+        )
+        coord = bucket.get("coordinator")
+        if coord is None or getattr(coord, "data", None) is None:
+            return []
+        out: list[tuple[str, str]] = []
+        for c in getattr(coord.data, "chargers", []) or []:
+            cid = c.get("id")
+            if not cid:
+                continue
+            name = c.get("name") or f"Charger {cid[:8]}"
+            out.append((cid, name))
+        return out
+
+    @staticmethod
+    def _outlet_field_label(name: str, cid: str) -> str:
+        """Schema key that also serves as the user-facing field label.
+
+        HA falls back to the key when no `data.<key>` translation matches,
+        so the label reads naturally without needing one translation per
+        dynamic charger.
+        """
+        return f"Outlet ID for {name} ({cid})"
+
     async def async_step_advanced_remote(
         self, user_input: dict[str, Any] | None = None,
     ):
-        """Remote start/stop configuration: id_tag + profile_id override.
+        """Remote start/stop configuration: id_tag, per-charger outlet IDs,
+        and an optional profile_id override.
 
-        Stored as top-level entry.data keys (additive, no schema bump
-        needed). Empty strings are treated as "clear" so users can drop
-        a previously-stored value without re-entering the whole flow.
+        Stored as top-level entry.data keys (additive, backwards compatible
+        with v1.0.0 entries that won't have them). Empty values clear the
+        stored setting so users can remove a configured value without
+        editing core.config_entries.json by hand.
         """
+        chargers = self._known_chargers()
         stored_tag = self.config_entry.data.get(CONF_DEFAULT_ID_TAG) or ""
         stored_profile = (
             self.config_entry.data.get(CONF_ADVANCED_PROFILE_ID) or ""
         )
+        raw_outlets = self.config_entry.data.get(DATA_DEFAULT_OUTLET_IDS)
+        stored_outlets: dict[str, str] = (
+            dict(raw_outlets) if isinstance(raw_outlets, dict) else {}
+        )
+
         if user_input is not None:
             tag = (user_input.get(CONF_DEFAULT_ID_TAG) or "").strip() or None
             profile = (
                 (user_input.get(CONF_ADVANCED_PROFILE_ID) or "").strip()
                 or None
             )
+            # Start from the existing dict so outlet IDs for chargers the
+            # coordinator no longer reports (e.g. user temporarily offline)
+            # aren't silently lost.
+            outlets: dict[str, str] = dict(stored_outlets)
+            for cid, name in chargers:
+                label = self._outlet_field_label(name, cid)
+                raw = (user_input.get(label) or "").strip()
+                if raw:
+                    outlets[cid] = raw
+                else:
+                    outlets.pop(cid, None)
+
             new_data = {**self.config_entry.data}
             if tag is None:
                 new_data.pop(CONF_DEFAULT_ID_TAG, None)
@@ -428,6 +481,11 @@ class TapOptionsFlowHandler(config_entries.OptionsFlow):
                 new_data.pop(CONF_ADVANCED_PROFILE_ID, None)
             else:
                 new_data[CONF_ADVANCED_PROFILE_ID] = profile
+            if outlets:
+                new_data[DATA_DEFAULT_OUTLET_IDS] = outlets
+            else:
+                new_data.pop(DATA_DEFAULT_OUTLET_IDS, None)
+
             self.hass.config_entries.async_update_entry(
                 self.config_entry, data=new_data,
             )
@@ -436,18 +494,20 @@ class TapOptionsFlowHandler(config_entries.OptionsFlow):
             )
             return self.async_create_entry(title="", data={})
 
-        schema = vol.Schema(
-            {
-                vol.Optional(
-                    CONF_DEFAULT_ID_TAG, default=stored_tag,
-                ): str,
-                vol.Optional(
-                    CONF_ADVANCED_PROFILE_ID, default=stored_profile,
-                ): str,
-            }
-        )
+        schema_dict: dict[Any, Any] = {
+            vol.Optional(CONF_DEFAULT_ID_TAG, default=stored_tag): str,
+        }
+        for cid, name in chargers:
+            label = self._outlet_field_label(name, cid)
+            schema_dict[
+                vol.Optional(label, default=stored_outlets.get(cid, ""))
+            ] = str
+        schema_dict[
+            vol.Optional(CONF_ADVANCED_PROFILE_ID, default=stored_profile)
+        ] = str
+
         return self.async_show_form(
-            step_id="advanced_remote", data_schema=schema,
+            step_id="advanced_remote", data_schema=vol.Schema(schema_dict),
         )
 
     async def async_step_advanced_enable(

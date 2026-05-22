@@ -93,9 +93,9 @@
       },
       "advanced_remote": {
         "title": "Instellingen op afstand starten/stoppen",
-        "description": "Optioneel. Stel het RFID-label in voor 'Start op afstand', en de profiel-ID die de chargerManagement-endpoint van Tap nodig heeft. Laat beide leeg om 'Start op afstand' uit te schakelen ('Stop op afstand' heeft enkel de actieve transactie-ID nodig, die de integratie al kent).",
+        "description": "Configureer 'Start op afstand'. Drie velden:\n\n• **Standaard RFID-label** — het id_tag dat verzonden wordt bij RemoteStartTransaction (formaat TAP-NNNNNN-N). Te vinden in de Tap-webapp onder Autorisaties, of op de achterkant van je fysieke RFID-kaart.\n\n• **Outlet-ID per laadpunt** — de interne outlet-identifier van Tap (ou_*) per laadpunt. Vereist voor 'Start op afstand'. Vastleggen via het Netwerk-tabblad (F12) van de Tap-webapp bij een 'start op afstand'-verzoek, of voer `tests/probe_har.py` uit op een opgeslagen .har-bestand.\n\n• **Profiel-ID** — optioneel. Override de usr_*-profielidentificatie die naar Tap's chargerManagement-endpoint gestuurd wordt. Laat leeg om je Firebase user_id te gebruiken (de standaard).\n\nLaat alle velden leeg om 'Start op afstand' uit te schakelen. 'Stop op afstand' blijft werken — die heeft enkel de actieve transactie-ID nodig, die de integratie al bijhoudt.",
         "data": {
-          "default_id_tag": "Standaard RFID-label voor 'Start op afstand' (optioneel)",
+          "default_id_tag": "Standaard RFID-label (TAP-NNNNNN-N)",
           "advanced_profile_id": "Tap profiel-ID (usr_…, optionele override)"
         }
       }
