@@ -1,0 +1,9 @@
+{
+  "_meta": {
+    "source": "synthesised — what Tap returns on 401",
+    "captured": "2026-04-27"
+  },
+  "data": {
+    "error": "unauthorised"
+  }
+}

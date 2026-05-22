@@ -10,6 +10,8 @@ import pytest
 
 from tapelectric.api_management import (
     MGMT_BASE_URL,
+    MGMT_WRITE_BASE_URL,
+    PATH_OCPP_MESSAGES,
     ManagementSession,
     TapManagementAuthError,
     TapManagementClient,
@@ -311,3 +313,246 @@ def test_close_is_noop_and_returns_none():
             return await client.close()
 
     assert _run(_do()) is None
+
+
+# ── OCPP write methods (remote start/stop) ────────────────────────────────
+
+def _ocpp_url(charger_id: str) -> str:
+    return f"{MGMT_WRITE_BASE_URL}{PATH_OCPP_MESSAGES.format(charger_id=charger_id)}"
+
+
+def test_remote_stop_transaction_happy(mock_aioresponse):
+    """Live API returns 200 + empty body — we synthesise Accepted."""
+    mock_aioresponse.post(_ocpp_url("EVB-1"), status=200, body="")
+
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            return await client.remote_stop_transaction("EVB-1", 9999)
+
+    result = _run(_do())
+    assert result == {"status": "Accepted"}
+
+
+def test_remote_stop_transaction_rejected(mock_aioresponse):
+    """If the API ever surfaces an explicit Rejected, pass it through."""
+    mock_aioresponse.post(
+        _ocpp_url("EVB-1"),
+        status=200,
+        payload={"status": "Rejected"},
+    )
+
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            return await client.remote_stop_transaction("EVB-1", 9999)
+
+    assert _run(_do()) == {"status": "Rejected"}
+
+
+def test_remote_stop_transaction_auth_error(mock_aioresponse):
+    mock_aioresponse.post(_ocpp_url("EVB-1"), status=401, body="nope")
+
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            await client.remote_stop_transaction("EVB-1", 9999)
+
+    with pytest.raises(TapManagementAuthError):
+        _run(_do())
+
+
+def test_remote_stop_transaction_network_error_returns_none(mock_aioresponse):
+    # 500 twice → TapManagementNetworkError → swallowed → None
+    mock_aioresponse.post(_ocpp_url("EVB-1"), status=500, body="")
+    mock_aioresponse.post(_ocpp_url("EVB-1"), status=500, body="")
+
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            return await client.remote_stop_transaction("EVB-1", 9999)
+
+    assert _run(_do()) is None
+
+
+def test_remote_stop_transaction_403_is_auth_error(mock_aioresponse):
+    mock_aioresponse.post(_ocpp_url("EVB-1"), status=403, body="")
+
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            await client.remote_stop_transaction("EVB-1", 9999)
+
+    with pytest.raises(TapManagementAuthError):
+        _run(_do())
+
+
+def test_remote_stop_transaction_requires_tid():
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            await client.remote_stop_transaction("EVB-1", None)  # type: ignore[arg-type]
+
+    with pytest.raises(TapManagementError):
+        _run(_do())
+
+
+def test_remote_start_transaction_happy(mock_aioresponse):
+    mock_aioresponse.post(_ocpp_url("EVB-1"), status=200, body="")
+
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            return await client.remote_start_transaction(
+                "EVB-1", outlet_id="ou_abc", id_tag="TAP-1",
+            )
+
+    assert _run(_do()) == {"status": "Accepted"}
+
+
+def test_remote_start_transaction_missing_id_tag_raises():
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            await client.remote_start_transaction(
+                "EVB-1", outlet_id="ou_abc", id_tag=None,
+            )
+
+    with pytest.raises(TapManagementError, match="id_tag"):
+        _run(_do())
+
+
+def test_remote_start_transaction_missing_outlet_id_raises():
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            await client.remote_start_transaction(
+                "EVB-1", outlet_id=None, id_tag="TAP-1",
+            )
+
+    with pytest.raises(TapManagementError, match="outlet_id"):
+        _run(_do())
+
+
+def test_remote_start_transaction_auth_error(mock_aioresponse):
+    mock_aioresponse.post(_ocpp_url("EVB-1"), status=401, body="")
+
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            await client.remote_start_transaction(
+                "EVB-1", outlet_id="ou_abc", id_tag="TAP-1",
+            )
+
+    with pytest.raises(TapManagementAuthError):
+        _run(_do())
+
+
+def test_remote_stop_sends_correct_envelope(mock_aioresponse):
+    """Verify the request body matches the schema captured from the webapp."""
+    mock_aioresponse.post(_ocpp_url("EVB-1"), status=200, body="")
+
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            await client.remote_stop_transaction("EVB-1", 9999)
+
+    _run(_do())
+    # aioresponses exposes the request history via .requests
+    posts = [
+        (k, v) for k, v in mock_aioresponse.requests.items()
+        if k[0] == "POST"
+    ]
+    assert posts, "no POST recorded"
+    call = posts[0][1][0]
+    body = call.kwargs.get("json")
+    assert body == {
+        "message_type": "remotestoptransaction",
+        "remote_stop_transaction_details": {"transaction_id": 9999},
+    }
+
+
+def test_remote_start_sends_correct_envelope(mock_aioresponse):
+    mock_aioresponse.post(_ocpp_url("EVB-1"), status=200, body="")
+
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_x", profile_id="usr_x",
+            )
+            await client.remote_start_transaction(
+                "EVB-1", outlet_id="ou_xyz", id_tag="TAP-1",
+            )
+
+    _run(_do())
+    posts = [
+        (k, v) for k, v in mock_aioresponse.requests.items()
+        if k[0] == "POST"
+    ]
+    assert posts
+    body = posts[0][1][0].kwargs.get("json")
+    assert body == {
+        "message_type": "remotestarttransaction",
+        "remote_start_transaction_details": {
+            "outlet_id": "ou_xyz",
+            "id_tag":    "TAP-1",
+            "visual_id": None,
+        },
+    }
+
+
+def test_remote_stop_sets_required_headers(mock_aioresponse):
+    """X-Account-Id and X-Profile-Id must be on the wire."""
+    mock_aioresponse.post(_ocpp_url("EVB-1"), status=200, body="")
+
+    async def _do():
+        async with aiohttp.ClientSession() as s:
+            client = TapManagementClient(
+                s, _FakeAuth(), _fresh_tokens(),
+                account_id="acc_test", profile_id="usr_test",
+            )
+            await client.remote_stop_transaction("EVB-1", 1)
+
+    _run(_do())
+    posts = [
+        (k, v) for k, v in mock_aioresponse.requests.items()
+        if k[0] == "POST"
+    ]
+    headers = posts[0][1][0].kwargs.get("headers") or {}
+    assert headers.get("X-Account-Id") == "acc_test"
+    assert headers.get("X-Profile-Id") == "usr_test"
+    assert headers.get("X-Api-Key")  # static; just confirm it's present

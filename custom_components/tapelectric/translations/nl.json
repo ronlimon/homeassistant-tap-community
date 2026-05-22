@@ -79,6 +79,7 @@
         "menu_options": {
           "advanced_enable": "Geavanceerde modus inschakelen",
           "advanced_update": "Gegevens bijwerken",
+          "advanced_remote": "Instellingen op afstand starten/stoppen",
           "advanced_disable": "Geavanceerde modus uitschakelen"
         }
       },
@@ -88,6 +89,14 @@
         "data": {
           "advanced_email": "E-mail",
           "password": "Wachtwoord"
+        }
+      },
+      "advanced_remote": {
+        "title": "Instellingen op afstand starten/stoppen",
+        "description": "Optioneel. Stel het RFID-label in voor 'Start op afstand', en de profiel-ID die de chargerManagement-endpoint van Tap nodig heeft. Laat beide leeg om 'Start op afstand' uit te schakelen ('Stop op afstand' heeft enkel de actieve transactie-ID nodig, die de integratie al kent).",
+        "data": {
+          "default_id_tag": "Standaard RFID-label voor 'Start op afstand' (optioneel)",
+          "advanced_profile_id": "Tap profiel-ID (usr_…, optionele override)"
         }
       }
     },
@@ -164,6 +173,13 @@
       "current_session_driver":     {"name": "Chauffeur huidige laadsessie"},
       "current_session_location":   {"name": "Locatie huidige laadsessie"},
       "current_session_started_at": {"name": "Start huidige laadsessie"}
+    },
+    "button": {
+      "stop_charging":  {"name": "Laden stoppen"},
+      "start_charging": {"name": "Laden starten"}
+    },
+    "switch": {
+      "charging_allowed": {"name": "Laden toegestaan (verouderd)"}
     }
   }
 }

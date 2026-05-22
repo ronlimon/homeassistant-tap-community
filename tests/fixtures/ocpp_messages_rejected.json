@@ -1,0 +1,9 @@
+{
+  "_meta": {
+    "source": "synthesised — current API returns 200 + empty body, but if firmware ever surfaces Rejected it'd look like this",
+    "captured": "2026-04-27"
+  },
+  "data": {
+    "status": "Rejected"
+  }
+}

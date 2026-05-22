@@ -30,7 +30,7 @@ device page or an energy-dashboard hookup._
   - Per-measurand sensors (Energy default-enabled; Power, Current,
     Voltage, SoC, Temperature available but default-hidden because
     many chargers only emit a subset)
-  - Remote: pause, resume, set charge-current limit, soft/hard reset
+  - Remote reset (soft/hard) via Tap's dedicated endpoint
   - Webhook support for push updates
 - **Advanced mode** (email + password, opt-in):
   - Live session energy (refreshes every ~30 s, no waiting for a
@@ -39,6 +39,12 @@ device page or an energy-dashboard hookup._
   - Richer closed-session detail (cost currency, transaction id,
     retail tariff breakdown — surfaces on the `last_session_energy`
     sensor's attributes with `source: "management"`)
+  - **Remote start / stop charging buttons** (since v1.0.1) — uses
+    the same OCPP RemoteStartTransaction / RemoteStopTransaction
+    envelope as Tap's own webapp. Requires advanced mode AND a
+    charger whose firmware honours remote control commands (see
+    [hardware compatibility](#hardware-compatibility) — EVBox Elvi
+    refuses both, empirically verified)
   - Automatic reauth prompt after 3 consecutive auth failures
 - **Localized**: English, Dutch (Belgian flavor), German (machine-
   translated — native review welcome), French (machine-translated —
@@ -146,29 +152,46 @@ as **Status**, **Charging**, **Plug connected**, etc.
 | Fault | binary_sensor | ✔ | public | Charger or connector fault |
 | Plug connected | binary_sensor | ✔ | public | Per-connector |
 | Charging | binary_sensor | ✔ | mgmt preferred | With `source` attribute |
-| Charging allowed | switch | ✔ | public | Pause / resume via OCPP SetChargingProfile |
+| Charging allowed | switch | ✖ (deprecated v1.0.1) | public | Old pause/resume via OCPP SetChargingProfile; underlying endpoint returns HTTP 400. Replaced by **Stop charging** / **Start charging** below. |
 | Charge current limit | number | ✔ | public | Slider; persisted in entry.data |
 | Auto-stop kWh / minutes / cost | number | ✖ | HA-local | Blueprint-driven thresholds |
 | Reset | button | ✔ | public | OCPP Reset via dedicated endpoint |
+| Stop charging | button | ✔ (advanced) | mgmt | OCPP RemoteStopTransaction. Available only while a session is active. |
+| Start charging | button | ✔ (advanced) | mgmt | OCPP RemoteStartTransaction. Needs a default RFID id_tag + per-charger outlet_id (set under Options → Advanced mode → Remote start/stop settings). |
 | Reset type | select | ✖ | HA-local | Soft / Hard — preselects for the reset button |
 
 ## Hardware compatibility
 
 This table is community-maintained. PRs welcome.
 
-| Charger model | Confirmed features | Missing measurands | Notes |
-| --- | --- | --- | --- |
-| **EVBox Elvi** | status, sessions, Energy, remote reset | Power, Current, Voltage, SoC, Temperature | Firmware only emits `Energy` OCPP measurand. Default-disabled entities will stay Unavailable — leave them off unless you want them exposed for history. |
-| Alfen | — (untested) | — | Expected full measurand set based on OCPP 1.6 spec. |
-| Wallbox | — (untested) | — | |
-| Zaptec | — (untested) | — | |
+| Charger model | Confirmed features | Missing measurands | Remote start/stop | Notes |
+| --- | --- | --- | --- | --- |
+| **EVBox Elvi** | status, sessions, Energy, remote reset | Power, Current, Voltage, SoC, Temperature | **No** (firmware refuses) | Firmware only emits `Energy` OCPP measurand. Both RemoteStop and RemoteStart are silently rejected by the charger — empirically verified in v1.0.1 testing and also reproducible via Tap's own webapp, which suggests the limitation is in EVBox firmware, not Tap or this integration. |
+| Alfen | — (untested) | — | Untested — looking for testers | Expected full measurand set based on OCPP 1.6 spec. |
+| Wallbox | — (untested) | — | Untested — looking for testers | |
+| Zaptec | — (untested) | — | Untested — looking for testers | |
 
 ## Known limitations
 
+- **EVBox Elvi firmware refuses RemoteStop and RemoteStart commands.**
+  Both buttons report 200 OK from Tap's API but the charger never
+  honours the request. Empirically verified by direct testing AND by
+  reproducing the issue via Tap's own webapp (which also can't stop a
+  session on EVBox Elvi). Almost certainly an EVBox-side safety
+  setting, not a Tap or integration issue. Other firmwares are
+  untested — please file an issue if your charger does or doesn't
+  honour remote start/stop.
 - **EVBox Elvi publishes only the `Energy` OCPP measurand.** Power,
   Current, Voltage, SoC, and Temperature entities ship disabled-by-
   default; they activate automatically when the entity is enabled in
   the registry and a reading comes in.
+- **"Charging allowed" switch is deprecated as of v1.0.1.** The
+  underlying public `/chargers/{id}/ocpp` endpoint returns HTTP 400
+  for every SetChargingProfile payload shape we've tested. Use the
+  new **Stop charging** / **Start charging** buttons instead.
+  Existing automations referencing `switch.charging_allowed` still
+  resolve to a (disabled) entity; nothing breaks, they just won't
+  fire.
 - **`GET /charger-sessions/{id}` returns 404** on the public API
   (confirmed 2026-04-23 against api.tapelectric.app). Single-session
   detail is only available via the management API / advanced mode.

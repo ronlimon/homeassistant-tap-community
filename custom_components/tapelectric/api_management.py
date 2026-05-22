@@ -51,6 +51,19 @@ _LOGGER = logging.getLogger(__name__)
 MGMT_BASE_URL = (
     "https://tap-electric-app-api.azurewebsites.net/api/1.0/management"
 )
+# Write-side endpoint lives under a different namespace than the read API.
+# Captured from web.tapelectric.app: POSTing to /management/.../ocppMessages
+# does not work; the webapp uses the camelCase chargerManagement path.
+MGMT_WRITE_BASE_URL = (
+    "https://tap-electric-app-api.azurewebsites.net/api/1.0/chargerManagement"
+)
+PATH_OCPP_MESSAGES = "/chargers/{charger_id}/ocppMessages"
+
+# OCPP message_type values understood by the chargerManagement endpoint.
+# These are NOT OCPP 1.6J action names — Tap wraps the OCPP intent in its
+# own snake_case envelope (see remote_stop_transaction / start_transaction).
+OCPP_MSG_REMOTE_STOP = "remotestoptransaction"
+OCPP_MSG_REMOTE_START = "remotestarttransaction"
 
 STATIC_HEADERS: dict[str, str] = {
     "X-Api-Key":       "5l^01Wmxs5ux",
@@ -283,11 +296,15 @@ class TapManagementClient:
         auth: TapFirebaseAuth,
         tokens: AuthTokens,
         account_id: str | None = None,
+        profile_id: str | None = None,
     ) -> None:
         self._session = session
         self.auth = auth
         self.tokens = tokens
         self.account_id = account_id
+        # X-Profile-Id (usr_*) is sent by the webapp on every request.
+        # Falls back to AuthTokens.user_id at request time when not given.
+        self.profile_id = profile_id
 
     # ── public surface ────────────────────────────────────────────────
 
@@ -334,6 +351,120 @@ class TapManagementClient:
         """Release any client-owned resources (none currently)."""
         return None
 
+    # ── write: OCPP remote start/stop ─────────────────────────────────
+
+    async def remote_stop_transaction(
+        self,
+        charger_id: str,
+        transaction_id: int,
+    ) -> dict | None:
+        """Send OCPP RemoteStopTransaction via the management API.
+
+        The endpoint returns 200 with an empty body whether the charger
+        firmware will execute the stop or refuse it (EVBox Elvi refuses
+        in practice). The Accepted/Rejected result, if any, comes back
+        asynchronously over webhook or via a follow-up status poll.
+
+        Returns:
+          - {"status": "Accepted"} when the API accepts the request
+            (HTTP 200). This signals the request was queued, not that
+            the charger actually executed it.
+          - None on a non-auth error (network etc.) so the caller can
+            show a soft warning instead of crashing the entity.
+
+        Raises:
+          TapManagementAuthError on 401/403.
+        """
+        if transaction_id is None:
+            raise TapManagementError(
+                "remote_stop_transaction needs a transaction_id"
+            )
+        body = {
+            "message_type": OCPP_MSG_REMOTE_STOP,
+            "remote_stop_transaction_details": {
+                "transaction_id": int(transaction_id),
+            },
+        }
+        return await self._post_ocpp_message(charger_id, body)
+
+    async def remote_start_transaction(
+        self,
+        charger_id: str,
+        *,
+        outlet_id: str | None = None,
+        id_tag: str | None = None,
+        visual_id: str | None = None,
+    ) -> dict | None:
+        """Send OCPP RemoteStartTransaction via the management API.
+
+        outlet_id: Tap's outlet identifier (ou_*). Captured from a GET
+                   /management/chargers/{id} response; the webapp picks
+                   it before issuing the start. Not the OCPP connector
+                   number — this is an internal Tap object id.
+        id_tag:    RFID-tag identifier. If None, raises with a clear
+                   pointer to the config option.
+        visual_id: Optional human-readable card label. Kept None on the
+                   wire unless caller knows the value.
+
+        Returns the same {"status": "Accepted"} envelope as
+        remote_stop_transaction on HTTP 200. Returns None on a non-auth
+        error. Raises TapManagementAuthError on 401/403.
+        """
+        if not id_tag:
+            raise TapManagementError(
+                "remote_start_transaction needs an id_tag — set the "
+                "'Default RFID tag for remote start' option under "
+                "Settings → Devices & Services → Tap Electric → Configure."
+            )
+        if not outlet_id:
+            raise TapManagementError(
+                "remote_start_transaction needs an outlet_id (ou_*). "
+                "Run tests/probe_har.py against a HAR captured from "
+                "web.tapelectric.app to discover it, then set it in the "
+                "advanced options."
+            )
+        body = {
+            "message_type": OCPP_MSG_REMOTE_START,
+            "remote_start_transaction_details": {
+                "outlet_id": outlet_id,
+                "id_tag":    id_tag,
+                "visual_id": visual_id,
+            },
+        }
+        return await self._post_ocpp_message(charger_id, body)
+
+    async def _post_ocpp_message(
+        self, charger_id: str, body: dict,
+    ) -> dict | None:
+        """POST an OCPP envelope to chargerManagement and normalise the
+        result. Auth errors bubble up; network errors return None."""
+        path = PATH_OCPP_MESSAGES.format(charger_id=charger_id)
+        try:
+            result = await self._request(
+                "POST", path, json=body, base_url=MGMT_WRITE_BASE_URL,
+            )
+        except TapManagementAuthError:
+            raise
+        except TapManagementNetworkError as err:
+            _LOGGER.warning(
+                "OCPP %s on %s failed (network): %s",
+                body.get("message_type"), charger_id, err,
+            )
+            return None
+        except TapManagementError as err:
+            _LOGGER.warning(
+                "OCPP %s on %s failed: %s",
+                body.get("message_type"), charger_id, err,
+            )
+            return None
+        # Captured live traffic shows 200 + empty body. If the API ever
+        # starts returning a status envelope (e.g. {"status": "Rejected"}),
+        # surface it untouched so callers can react. Otherwise synthesise
+        # an Accepted to signal the request was queued.
+        if isinstance(result, dict):
+            return result
+        return {"status": "Accepted"}
+
     # ── plumbing ──────────────────────────────────────────────────────
 
     async def _ensure_tokens(self) -> None:
@@ -362,6 +493,13 @@ class TapManagementClient:
                 "X-Account-Id not yet discovered — call discover_account_id() "
                 "before other endpoints, or expect a 4xx."
             )
+        # X-Profile-Id (usr_*) is required by the chargerManagement write
+        # endpoint and harmless on the read endpoints. Use whatever the
+        # user/config supplied; otherwise reach for the Firebase user id
+        # the auth flow already gave us (same format).
+        profile_id = self.profile_id or getattr(self.tokens, "user_id", None)
+        if profile_id:
+            headers["X-Profile-Id"] = profile_id
         return headers
 
     async def _request(
@@ -370,10 +508,12 @@ class TapManagementClient:
         path: str,
         *,
         params: dict | None = None,
+        json: Any = None,
+        base_url: str | None = None,
         allow_missing_account_id: bool = False,
     ) -> Any:
         await self._ensure_tokens()
-        url = f"{MGMT_BASE_URL}{path}"
+        url = f"{base_url or MGMT_BASE_URL}{path}"
         headers = self._build_headers(
             allow_missing_account_id=allow_missing_account_id,
         )
@@ -384,7 +524,8 @@ class TapManagementClient:
             try:
                 async with self._session.request(
                     method, url,
-                    params=params, headers=headers, timeout=_TIMEOUT,
+                    params=params, json=json,
+                    headers=headers, timeout=_TIMEOUT,
                 ) as resp:
                     status = resp.status
                     body_bytes = await resp.read()
@@ -397,11 +538,12 @@ class TapManagementClient:
                             return None
                         return await _decode_json(resp, body_bytes)
 
-                    if status == 401:
+                    if status in (401, 403):
                         _LOGGER.warning(
-                            "%s %s -> 401; id_token likely stale despite "
-                            "leeway. Forcing a refresh on next call.",
-                            method, path,
+                            "%s %s -> %d; id_token likely stale or the "
+                            "account lacks permission. Forcing a refresh "
+                            "on next call.",
+                            method, path, status,
                         )
                         raise TapManagementAuthError(
                             f"Unauthorized ({status}) on {method} {path}"

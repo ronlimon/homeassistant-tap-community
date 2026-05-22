@@ -1,6 +1,18 @@
 """Switch platform — pause/resume charging via OCPP SetChargingProfile.
 
-Semantics:
+DEPRECATED (v1.0.1): the public /chargers/{id}/ocpp endpoint refuses
+every SetChargingProfile envelope we've tried (verified across 8+ payload
+variants, all returning HTTP 400 "Data field is required"). Tap's own
+webapp uses a different endpoint (/chargerManagement/.../ocppMessages)
+which we now expose via the button.tapelectric_stop_charging and
+button.tapelectric_start_charging entities (advanced mode required).
+
+This switch class is kept for backwards compatibility with existing
+automations referencing `switch.charging_allowed`. Entities ship
+disabled by default; existing entries that already enabled them keep
+working until users migrate to the new buttons.
+
+Semantics (when the underlying API is fixed by Tap):
   on  → SetChargingProfile with connector.maxAmperage (fallback: config)
   off → SetChargingProfile with 0A (charger → SUSPENDEDEVSE)
 
@@ -88,6 +100,14 @@ async def async_setup_entry(
 class ChargeAllowedSwitch(CoordinatorEntity[TapCoordinator], SwitchEntity):
     _attr_has_entity_name = True
     _attr_icon = "mdi:ev-plug-type2"
+    # Disabled by default since v1.0.1: the underlying public-API endpoint
+    # returns HTTP 400 across all observed payload schemas. The new
+    # button.tapelectric_stop_charging / button.tapelectric_start_charging
+    # entities replace it for advanced-mode users. Existing automations
+    # that reference the entity by id still resolve to a (disabled) entity
+    # — they just won't fire commands until the user re-enables it or
+    # migrates to the new buttons.
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,

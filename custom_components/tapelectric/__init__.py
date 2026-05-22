@@ -26,6 +26,7 @@ from .const import (
     CONF_ADVANCED_EMAIL,
     CONF_ADVANCED_FIREBASE_USER_ID,
     CONF_ADVANCED_MODE,
+    CONF_ADVANCED_PROFILE_ID,
     CONF_ADVANCED_REFRESH_TOKEN,
     CONF_API_KEY,
     CONF_BASE_URL,
@@ -134,6 +135,7 @@ async def _bootstrap_advanced_client(
     client = TapManagementClient(
         session, auth, tokens,
         account_id=entry.data.get(CONF_ADVANCED_ACCOUNT_ID),
+        profile_id=entry.data.get(CONF_ADVANCED_PROFILE_ID),
     )
     # If we forgot to persist account_id at setup, recover it now.
     if client.account_id is None:

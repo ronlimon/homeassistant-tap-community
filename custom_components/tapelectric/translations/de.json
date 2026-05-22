@@ -77,6 +77,7 @@
         "menu_options": {
           "advanced_enable": "Erweiterten Modus aktivieren",
           "advanced_update": "Anmeldedaten aktualisieren",
+          "advanced_remote": "Einstellungen für Fernstart/-stopp",
           "advanced_disable": "Erweiterten Modus deaktivieren"
         }
       },
@@ -84,6 +85,14 @@
         "title": "Tap-App-Anmeldedaten",
         "description": "Mit Tap-App-E-Mail und Passwort anmelden. Das Passwort wird nicht gespeichert — nur das Refresh-Token.",
         "data": {"advanced_email": "E-Mail", "password": "Passwort"}
+      },
+      "advanced_remote": {
+        "title": "Einstellungen für Fernstart/-stopp",
+        "description": "Optional. RFID-Tag für den Fernstart und die Profil-ID des chargerManagement-Endpunkts von Tap festlegen. Beide Felder leer lassen, um den Fernstart zu deaktivieren (Fernstopp benötigt nur die aktive Transaktions-ID, die die Integration bereits kennt).",
+        "data": {
+          "default_id_tag": "Standard-RFID-Tag für Fernstart (optional)",
+          "advanced_profile_id": "Tap-Profil-ID (usr_…, optionaler Override)"
+        }
       }
     },
     "error": {
@@ -159,6 +168,13 @@
       "current_session_driver":     {"name": "Aktueller Sitzungsfahrer"},
       "current_session_location":   {"name": "Aktueller Sitzungsstandort"},
       "current_session_started_at": {"name": "Aktueller Sitzungsstart"}
+    },
+    "button": {
+      "stop_charging":  {"name": "Laden stoppen"},
+      "start_charging": {"name": "Laden starten"}
+    },
+    "switch": {
+      "charging_allowed": {"name": "Laden erlaubt (veraltet)"}
     }
   }
 }

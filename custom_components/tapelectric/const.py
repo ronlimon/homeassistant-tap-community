@@ -139,6 +139,19 @@ CONF_ADVANCED_EMAIL = "advanced_email"
 CONF_ADVANCED_REFRESH_TOKEN = "advanced_refresh_token"
 CONF_ADVANCED_ACCOUNT_ID = "advanced_account_id"
 CONF_ADVANCED_FIREBASE_USER_ID = "advanced_firebase_user_id"
+# usr_* identifier the chargerManagement endpoint requires on every write.
+# Optional — falls back to AuthTokens.user_id at request time. Users can
+# override here if their fleet links a different profile.
+CONF_ADVANCED_PROFILE_ID = "advanced_profile_id"
+# RFID tag identifier used as id_tag on OCPP RemoteStartTransaction.
+# Stored as a top-level entry.data field (additive, backwards compatible
+# with v1.0.0 entries that won't have it).
+CONF_DEFAULT_ID_TAG = "default_id_tag"
+# Tap "outlet" id (ou_*) per (charger_id, connector_id). Required for the
+# OCPP RemoteStartTransaction envelope. Stored as a nested dict so it can
+# hold one outlet per charger:
+#   default_outlet_ids: { <charger_id>: "ou_..." }
+DATA_DEFAULT_OUTLET_IDS = "default_outlet_ids"
 
 # Advanced-mode polling cadence. Independent of the public API's
 # OPT_SCAN_INTERVAL_* so that users who disable basic-mode fast polling

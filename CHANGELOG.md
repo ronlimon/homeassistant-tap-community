@@ -6,7 +6,62 @@ project uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Nothing pending beyond what shipped in 1.0.0.
+Nothing pending beyond what shipped in 1.0.1.
+
+## [1.0.1] — 2026-04-27
+
+### Fixed
+
+- **OCPP envelope schema and endpoint corrected.** The "Charging
+  allowed" switch in 1.0.0 posted to `/chargers/{id}/ocpp` with a
+  SetChargingProfile body that the public API rejects with HTTP 400
+  ("Data field is required") across every payload variant we
+  tested. Reverse-engineered Tap's own webapp on 2026-04-27 and
+  confirmed the working schema lives on a different endpoint
+  (`/chargerManagement/chargers/{id}/ocppMessages`) with a snake_case
+  envelope (`message_type` + `remote_*_transaction_details`).
+
+### Added
+
+- **Remote Start charging button** (`button.tapelectric_start_charging`).
+  Advanced mode only. Sends OCPP RemoteStartTransaction with a
+  configured RFID `id_tag` and per-charger `outlet_id`. Disabled
+  automatically when a session is already active or required
+  config is missing.
+- **Remote Stop charging button** (`button.tapelectric_stop_charging`).
+  Advanced mode only. Sends OCPP RemoteStopTransaction with the
+  currently-active management-API transaction id. Disabled when no
+  active session is known.
+- **Options → Advanced mode → Remote start/stop settings.** New
+  options-flow step to enter the default RFID id_tag and (optionally)
+  override the Tap profile id (`usr_…`). Stored additively in
+  `entry.data` — v1.0.0 entries load without migration.
+- `TapManagementClient.remote_stop_transaction` and
+  `remote_start_transaction` — the new write methods. Auth failures
+  (401/403) raise `TapManagementAuthError`; network errors return
+  `None` so the button stays responsive. The synchronous response
+  envelope from the live API is empty 200, so we synthesise
+  `{"status": "Accepted"}`; an explicit `{"status": "Rejected"}` (if
+  the API ever surfaces it) is passed through unchanged.
+- `tests/probe_har.py` — reproducible HAR-capture parser for the
+  next time we need to chase Tap-side schema changes. Masks
+  Authorization/Cookie/api-key values automatically.
+
+### Deprecated
+
+- `switch.charging_allowed` (the SetChargingProfile-based "Charging
+  allowed" entity). Ships with `entity_registry_enabled_default=
+  False`. Existing automations referencing it still resolve to a
+  (disabled) entity, so nothing crashes — migrate to the new
+  Stop/Start buttons when convenient.
+
+### Known limitations
+
+- EVBox Elvi firmware silently refuses both RemoteStop and
+  RemoteStart. The integration logs a warning and stays responsive.
+  This is also reproducible from Tap's own webapp — almost certainly
+  an EVBox firmware setting, not a Tap- or integration-side bug.
+  Other charger models untested; community datapoints welcome.
 
 ## [1.0.0] — 2026-04-23
 

@@ -48,10 +48,12 @@ from .const import (
     CONF_ADVANCED_EMAIL,
     CONF_ADVANCED_FIREBASE_USER_ID,
     CONF_ADVANCED_MODE,
+    CONF_ADVANCED_PROFILE_ID,
     CONF_ADVANCED_REFRESH_TOKEN,
     CONF_API_KEY,
     CONF_BASE_URL,
     CONF_CHARGER_ID,
+    CONF_DEFAULT_ID_TAG,
     CONF_WEBHOOK_SECRET,
     DEFAULT_BASE_URL,
     DEFAULT_OPTIONS,
@@ -151,6 +153,12 @@ async def _advanced_sign_in(
             CONF_ADVANCED_REFRESH_TOKEN: client.tokens.refresh_token,
             CONF_ADVANCED_ACCOUNT_ID: account_id,
             CONF_ADVANCED_FIREBASE_USER_ID: tokens.user_id,
+            # The chargerManagement write endpoint requires X-Profile-Id.
+            # The Firebase user id (usr_*) doubles as the profile id for
+            # normal personal accounts; fleet drivers may need to
+            # override this from Options if their fleet ties them to a
+            # different profile.
+            CONF_ADVANCED_PROFILE_ID: tokens.user_id,
         },
         None,
     )
@@ -380,12 +388,66 @@ class TapOptionsFlowHandler(config_entries.OptionsFlow):
         enabled = bool(self.config_entry.data.get(CONF_ADVANCED_MODE))
         options: list[str] = []
         if enabled:
-            options = ["advanced_update", "advanced_disable"]
+            options = [
+                "advanced_update",
+                "advanced_remote",
+                "advanced_disable",
+            ]
         else:
             options = ["advanced_enable"]
         return self.async_show_menu(
             step_id="advanced_menu",
             menu_options=options,
+        )
+
+    async def async_step_advanced_remote(
+        self, user_input: dict[str, Any] | None = None,
+    ):
+        """Remote start/stop configuration: id_tag + profile_id override.
+
+        Stored as top-level entry.data keys (additive, no schema bump
+        needed). Empty strings are treated as "clear" so users can drop
+        a previously-stored value without re-entering the whole flow.
+        """
+        stored_tag = self.config_entry.data.get(CONF_DEFAULT_ID_TAG) or ""
+        stored_profile = (
+            self.config_entry.data.get(CONF_ADVANCED_PROFILE_ID) or ""
+        )
+        if user_input is not None:
+            tag = (user_input.get(CONF_DEFAULT_ID_TAG) or "").strip() or None
+            profile = (
+                (user_input.get(CONF_ADVANCED_PROFILE_ID) or "").strip()
+                or None
+            )
+            new_data = {**self.config_entry.data}
+            if tag is None:
+                new_data.pop(CONF_DEFAULT_ID_TAG, None)
+            else:
+                new_data[CONF_DEFAULT_ID_TAG] = tag
+            if profile is None:
+                new_data.pop(CONF_ADVANCED_PROFILE_ID, None)
+            else:
+                new_data[CONF_ADVANCED_PROFILE_ID] = profile
+            self.hass.config_entries.async_update_entry(
+                self.config_entry, data=new_data,
+            )
+            await self.hass.config_entries.async_reload(
+                self.config_entry.entry_id,
+            )
+            return self.async_create_entry(title="", data={})
+
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_DEFAULT_ID_TAG, default=stored_tag,
+                ): str,
+                vol.Optional(
+                    CONF_ADVANCED_PROFILE_ID, default=stored_profile,
+                ): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="advanced_remote", data_schema=schema,
         )
 
     async def async_step_advanced_enable(

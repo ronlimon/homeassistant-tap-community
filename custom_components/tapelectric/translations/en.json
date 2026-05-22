@@ -79,6 +79,7 @@
         "menu_options": {
           "advanced_enable": "Enable advanced mode",
           "advanced_update": "Update credentials",
+          "advanced_remote": "Remote start/stop settings",
           "advanced_disable": "Disable advanced mode"
         }
       },
@@ -88,6 +89,14 @@
         "data": {
           "advanced_email": "Email",
           "password": "Password"
+        }
+      },
+      "advanced_remote": {
+        "title": "Remote start/stop settings",
+        "description": "Optional. Set the RFID tag used for Remote Start, and the profile ID required by Tap's chargerManagement endpoint. Leave both empty to disable Remote Start (Remote Stop only needs the active transaction ID, which the integration already knows).",
+        "data": {
+          "default_id_tag": "Default RFID tag for remote start (optional)",
+          "advanced_profile_id": "Tap profile ID (usr_…, optional override)"
         }
       }
     },
@@ -164,6 +173,13 @@
       "current_session_driver":       {"name": "Current session driver"},
       "current_session_location":     {"name": "Current session location"},
       "current_session_started_at":   {"name": "Current session started at"}
+    },
+    "button": {
+      "stop_charging":  {"name": "Stop charging"},
+      "start_charging": {"name": "Start charging"}
+    },
+    "switch": {
+      "charging_allowed": {"name": "Charging allowed (deprecated)"}
     }
   }
 }

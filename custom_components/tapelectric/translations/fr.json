@@ -77,6 +77,7 @@
         "menu_options": {
           "advanced_enable": "Activer le mode avancé",
           "advanced_update": "Mettre à jour les identifiants",
+          "advanced_remote": "Paramètres de démarrage/arrêt à distance",
           "advanced_disable": "Désactiver le mode avancé"
         }
       },
@@ -84,6 +85,14 @@
         "title": "Identifiants de l'application Tap",
         "description": "Connectez-vous avec l'e-mail et le mot de passe de l'app Tap. Le mot de passe n'est pas conservé — uniquement le jeton de rafraîchissement.",
         "data": {"advanced_email": "E-mail", "password": "Mot de passe"}
+      },
+      "advanced_remote": {
+        "title": "Paramètres de démarrage/arrêt à distance",
+        "description": "Optionnel. Définit le tag RFID utilisé pour le démarrage à distance ainsi que l'identifiant de profil exigé par l'endpoint chargerManagement de Tap. Laissez les deux vides pour désactiver le démarrage à distance (l'arrêt à distance ne nécessite que l'identifiant de transaction active, déjà connu par l'intégration).",
+        "data": {
+          "default_id_tag": "Tag RFID par défaut pour le démarrage à distance (optionnel)",
+          "advanced_profile_id": "Identifiant de profil Tap (usr_…, override optionnel)"
+        }
       }
     },
     "error": {
@@ -159,6 +168,13 @@
       "current_session_driver":     {"name": "Conducteur de la session en cours"},
       "current_session_location":   {"name": "Lieu de la session en cours"},
       "current_session_started_at": {"name": "Début de la session en cours"}
+    },
+    "button": {
+      "stop_charging":  {"name": "Arrêter la charge"},
+      "start_charging": {"name": "Démarrer la charge"}
+    },
+    "switch": {
+      "charging_allowed": {"name": "Charge autorisée (obsolète)"}
     }
   }
 }
